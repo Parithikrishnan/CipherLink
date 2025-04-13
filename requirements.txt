@@ -1,0 +1,10 @@
+subprocess
+platform
+socket
+time
+os
+hashlib
+threading
+collections
+tkinter
+Pillow==10.2.0
