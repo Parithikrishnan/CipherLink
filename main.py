@@ -292,11 +292,20 @@ def chat_backend():
             while True:
                 ip = simpledialog.askstring("Enter Server IP", "Server IP:")
                 if ip is None:
-                    return
+                    return  
                 try:
                     parts = ip.split('.')
                     if len(parts) != 4:
                         raise ValueError
+                    else:
+                        if ip is not None:
+                            one,two,three,four = ip.split('.')
+                            one1,two2,three3,four4 = ip_address.split('.')
+                            if(one == one1 and two == two2 and three == three3):
+                                pass
+                            else:
+                                display_output("This ip is not in your network\n")
+                                continue
                 except:
                     display_output("The format is wrong. Please enter it again (e.g., 192.168.0.1)\n")
                     continue
@@ -423,9 +432,19 @@ def receive_file_backend():
                 parts = SERVER_IP.split('.')
                 if len(parts) != 4:
                     raise ValueError
+                else:
+                    if SERVER_IP is not None:
+                        one,two,three,four = SERVER_IP.split('.')
+                        one1,two2,three3,four4 = ip_address.split('.')
+                        if(one == one1 and two == two2 and three == three3):
+                            pass
+                        else:
+                            display_output("This ip is not in your network\n")
+                            continue
             except:
                 display_output("The format is wrong. Please enter it again (e.g., 192.168.0.1)\n")
                 continue
+            
             try:
                 try:
                     client_socket.connect((SERVER_IP, 52837))
