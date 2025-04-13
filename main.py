@@ -4,16 +4,24 @@ import subprocess as sp
 import platform as p 
 import socket as s
 import time as t
-from tkinter import Tk, Text, Label, Frame, Toplevel, Button, END,Entry, WORD 
-from tkinter import simpledialog, filedialog
+from tkinter import Tk, Text, Label, Frame, Toplevel, Button, END,Entry, WORD,DISABLED,LEFT, RIGHT,X,Y
+from tkinter import simpledialog, filedialog, messagebox,Scrollbar,BOTH
 from PIL import Image, ImageTk, ImageFilter
 import os
 import hashlib
+import threading as th
+from collections import defaultdict
+
+
+#----------------------------------------------------------------------------------------------------------------------------------
 
 
 ip_address = None
 System_os = p.system()
-#about_text="This application is uses cryptographic and hashing algorithms in order to provide security and privacy over the network.\nThis application uses AVL Tree, Hashing and Multigraph to share Images,Videos,Files,Text over the network in an efficient manner.\n\nThis app was made for Data Structures Laboratory project by Parithikrishnan and Nirupa.\n"
+
+
+#-----------------------------------------------------------------------------------------------------------------------------------
+
 
 
 def connection_checking():
@@ -22,17 +30,15 @@ def connection_checking():
     if(System_os == "Linux"):
         wifi_result_linux = sp.run(['nmcli', 'connection' ,'show', '--active'],capture_output=True,text=True)
         if("wifi" in wifi_result_linux.stdout):
-            print("Connected to a wifi network\n")
             connected_to_wifi = True
         else:
-            print("\nConnect to a wifi network\n")
+            connected_to_wifi = False
     elif (System_os == "Windows"):
         wifi_result_windows = sp.run('netsh wlan show interfaces | findstr /R "^ *SSID"',capture_output=True,text=True,)
         if("SSID" not in wifi_result_windows.stdout):
-            print("\nConnect to a wifi network\n")
+            connected_to_wifi = False
         else:
             connected_to_wifi = True
-            print("Connected to a wifi network\n")
     else:
         pass
     # Ip address check
@@ -52,15 +58,14 @@ def connection_checking():
         connection_checking()
 
 
+#------------------------------------------------------------------------------------------------------------------------------
+
 checking,ip_address = connection_checking()
-
-    
-
 HOST = '0.0.0.0' 
 server_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
 
 
-
+#---------------------------------------------------------------------------------------------------------------------------------
 
 
 root=Tk()
@@ -101,14 +106,264 @@ button_frame.place(x=frame_x,y=frame_y,width=frame_width,height=frame_height)
 output_window=None
 output_text=None
 
+#----------------------------------------------------------------------------------------------------------------------------------
+
+
 def display_output(text):
     global output_text
     if output_text:
         output_text.insert(END, text + "\n")
         output_text.see(END)
 
+
+#----------------------------------------------------------------------------------------------------------------------------------
+
 def chat_backend():
-    pass
+
+    global connected_socket
+    connected_socket = None  
+
+
+    class MultiGraph:
+        def __init__(self):
+            self.graph = defaultdict(list) 
+
+        def add_edge(self, sender, receiver, message):
+            timestamp = int(t.time())
+            self.graph[sender].append((receiver, message, timestamp))
+
+        def get_messages(self, user1, user2):
+            return [(r, m, t) for r, m, t in self.graph[user1] if r == user2]
+
+        def display_all(self):
+            for sender in self.graph:
+                print(f"{sender} sent messages to:")
+                for receiver, message, timestamp in self.graph[sender]:
+                    print(f"  ➤ {receiver}: {message} [{timestamp}]")
+
+        def save_to_text(self, filename="chat_logs.txt"):
+            with open(filename, "w", encoding="utf-8") as f:
+                for sender in self.graph:
+                    for receiver, message, timestamp in self.graph[sender]:
+                        escaped_message = message.replace('"', '\\"')
+                        f.write(f'multigraph.add_edge("{sender}", "{receiver}", "{escaped_message}", {timestamp})\n')
+
+
+
+    class AVLTreeNode:
+        def __init__(self, key, message):
+            self.key = key
+            self.message = message
+            self.left = None
+            self.right = None
+            self.height = 1
+
+    class AVLTree:
+        def __init__(self):
+            self.root = None
+
+        def get_height(self, node):
+            return node.height if node else 0
+
+        def get_balance(self, node):
+            return self.get_height(node.left) - self.get_height(node.right)
+
+        def rotate_right(self, y):
+            x = y.left
+            T2 = x.right
+            x.right = y
+            y.left = T2
+            y.height = max(self.get_height(y.left), self.get_height(y.right)) + 1
+            x.height = max(self.get_height(x.left), self.get_height(x.right)) + 1
+            return x
+
+        def rotate_left(self, x):
+            y = x.right
+            T2 = y.left
+            y.left = x
+            x.right = T2
+            x.height = max(self.get_height(x.left), self.get_height(x.right)) + 1
+            y.height = max(self.get_height(y.left), self.get_height(y.right)) + 1
+            return y
+
+        def insert(self, root, key, message):
+            if not root:
+                return AVLTreeNode(key, message)
+            if key < root.key:
+                root.left = self.insert(root.left, key, message)
+            else:
+                root.right = self.insert(root.right, key, message)
+
+            root.height = max(self.get_height(root.left), self.get_height(root.right)) + 1
+            balance = self.get_balance(root)
+
+            if balance > 1 and key < root.left.key:
+                return self.rotate_right(root)
+            if balance < -1 and key > root.right.key:
+                return self.rotate_left(root)
+            if balance > 1 and key > root.left.key:
+                root.left = self.rotate_left(root.left)
+                return self.rotate_right(root)
+            if balance < -1 and key < root.right.key:
+                root.right = self.rotate_right(root.right)
+                return self.rotate_left(root)
+            return root
+
+        def add_message(self, key, message):
+            self.root = self.insert(self.root, key, message)
+            with open("chat_tree.txt", "w", encoding="utf-8") as f:
+                self.save_tree_structure(self.root, f)
+
+        def save_tree_structure(self, node, f, level=0, prefix="Root: "):
+            if node is not None:
+                self.save_tree_structure(node.right, f, level + 1, "R---- ")
+                f.write("     " * level + prefix + f"[{node.key}] {node.message}\n")
+                self.save_tree_structure(node.left, f, level + 1, "L---- ")
+
+    def display_output(text):
+        global output_text
+        if output_text:
+            output_text.insert(END, text + "\n")
+            output_text.see(END)
+
+    def create_gui():
+        global output_window, output_text, message_entry, send_button, server_button, client_button
+
+        chat_frame = Frame(output_window, bg="#0a1a2a", bd=2, highlightbackground="#00b4d8")
+        chat_frame.place(relwidth=0.9, relheight=0.75, relx=0.05, rely=0.05)
+
+        output_text = Text(chat_frame, font=("Courier", 12), fg="white", bg="#0a1a2a",
+                           insertbackground="white", wrap="word")
+        output_text.pack(fill="both", expand=True, padx=10, pady=10)
+
+        input_frame = Frame(output_window, bg="#001f3f")
+        input_frame.place(relwidth=0.9, relheight=0.1, relx=0.05, rely=0.82)
+
+        message_entry = Entry(input_frame, font=("Arial", 12), fg="black")
+        message_entry.pack(side="left", fill="x", expand=True, padx=(10, 5), pady=10)
+
+        send_button = Button(input_frame, text="Send", font=("Arial", 12, "bold"),
+                             bg="#00b4d8", fg="white", padx=15, pady=5)
+        send_button.pack(side="right", padx=(5, 10))
+
+        action_frame = Frame(output_window, bg="#001f3f")
+        action_frame.place(relwidth=0.9, relheight=0.07, relx=0.05, rely=0.93)
+
+        server_button = Button(action_frame, text="Start Server", font=("Arial", 11, "bold"),
+                               bg="#28a745", fg="white", padx=10, pady=5)
+        server_button.pack(side="left", padx=20)
+
+        client_button = Button(action_frame, text="Join Server", font=("Arial", 11, "bold"),
+                               bg="#007bff", fg="white", padx=10, pady=5)
+        client_button.pack(side="left", padx=20)
+
+        server_button.config(command=start_server)
+        client_button.config(command=join_server)
+        send_button.config(command=send_message)
+
+    username_of = ""
+    tree = AVLTree()
+    multigraph = MultiGraph()
+
+
+    def start_server():
+        global connected_socket, username_of, username
+        try:
+            server_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+            try:
+                server_socket.bind(('0.0.0.0', 5293))
+            except:
+                server_socket.bind(('0.0.0.0',5298))
+            server_socket.listen(1)
+            display_output("Server started and listening...\n")
+            connected_socket, addr = server_socket.accept()
+            display_output(f"{addr} connected\n")
+            username_of = connected_socket.recv(1024).decode('utf-8')
+            display_output(f"{username_of} joined the server with ip {addr}\n")
+            connected_socket.send(username.encode('utf-8'))
+            th.Thread(target=handle_receive, args=(connected_socket,), daemon=True).start()
+        except Exception as e:
+            display_output(f"Server Error: {e}")
+
+    def join_server():
+        global connected_socket, username_of, username
+        try:
+            connected_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+            while True:
+                ip = simpledialog.askstring("Enter Server IP", "Server IP:")
+                if ip is None:
+                    return
+                try:
+                    parts = ip.split('.')
+                    if len(parts) != 4:
+                        raise ValueError
+                except:
+                    display_output("The format is wrong. Please enter it again (e.g., 192.168.0.1)\n")
+                    continue
+                try:
+                    try:
+                        connected_socket.connect((ip, 5293))
+                        break
+                    except:
+                        connected_socket.connect((ip,5298))
+                        break
+                except:
+                    display_output("The IP address you have entered is wrong\n")
+                    continue
+                    
+            display_output(f"YOU are connected to the chat server\n")
+            connected_socket.send(username.encode('utf-8'))
+            username_of = connected_socket.recv(1024).decode('utf-8')
+            display_output(f"You are chatting with {username_of}\n")
+            th.Thread(target=handle_receive, args=(connected_socket,), daemon=True).start()
+        except Exception as e:
+            display_output(f"Client Error: {e}")
+
+    def handle_receive(sock):
+        global username_of
+        while True:
+            try:
+                msg = sock.recv(1024).decode()
+                if msg:
+                    timestamp = int(t.time())
+                    tree.add_message(timestamp, f"{username_of}: {msg}")
+                    multigraph.add_edge(username_of, username, msg)
+                    multigraph.save_to_text()
+                    output_text.insert("end", f"{username_of}: {msg}\n")
+                    output_text.see("end")
+            except:
+                break
+
+    def send_message():
+        global connected_socket, username
+        msg = message_entry.get()
+        if msg:
+            message_entry.delete(0, "end")
+            timestamp = int(t.time())
+            tree.add_message(timestamp, f"{username}: {msg}")
+            output_text.insert("end", f"{username}: {msg}\n")
+            multigraph.add_edge(username, username_of, msg)
+            multigraph.save_to_text()
+            output_text.see("end")
+            try:
+                if connected_socket:
+                    connected_socket.send(msg.encode())
+                else:
+                    output_text.insert("end", "No active connection.\n")
+            except Exception as e:
+                output_text.insert("end", f"Failed to send: {e}\n")
+
+    if(checking):
+        display_output("Connected to a wifi network\n")
+        create_gui()
+    else:
+        display_output("Connect to a wifi network\nYou are not connected\n")
+        return
+
+
+
+#--------------------------------------------------------------------------------------------------------------------------
+
 
 def send_file_backend():
     global server_socket
@@ -155,6 +410,8 @@ def send_file_backend():
     conn.close()
     server_socket.close()
 
+#--------------------------------------------------------------------------------------------------------------------
+
 def receive_file_backend():
     try:
         client_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
@@ -171,29 +428,15 @@ def receive_file_backend():
                 continue
             try:
                 try:
-                    if(System_os == "Linux"):
-                        pinger = sp.run(['ping','-w','10','-c','1',SERVER_IP],text=True,capture_output=True)
-                    else:
-                        pinger= sp.run(["ping", "-n", "1", "-w", "1000", SERVER_IP,],text=True,capture_output=True)
-                    if('64 bytes from' in pinger.stdout):
-                        client_socket.connect((SERVER_IP, 52837))
-                        break
-                    elif('Destination Host Unreachable' in pinger):
-                        continue
-                    else:
-                        continue
+                    client_socket.connect((SERVER_IP, 52837))
+                    break
                 except:
-                    pinger = sp.run(['ping',SERVER_IP,'p','52838'],text=True,capture_output=True,timeout=10)
-                    if('64 bytes from' in pinger.stdout):
-                        client_socket.connect((SERVER_IP, 52838))
-                        break
-                    elif('Destination Host Unreachable' in pinger):
-                        continue
-                    else:
-                        continue
-            except:
+                    client_socket.connect((SERVER_IP,52838))
+                    break
+            except: 
                 display_output("The IP address you have entered is wrong\n")
                 continue
+
         display_output("Connected to the server.")
         username_of_sender = client_socket.recv(1024).decode('utf-8')
         client_socket.send(username.encode("utf-8"))
@@ -239,6 +482,8 @@ def receive_file_backend():
     except Exception as e:
         display_output(f"Error: {e}")
 
+#--------------------------------------------------------------------------------------------------------------------------------
+
 
 def about_backend():
     return '''Cipher Link v1.0
@@ -247,34 +492,48 @@ Features:
 - Encrypted messaging
 - Fast and secure file transfers
 - Easy-to-use interface
+
+This application is uses cryptographic and hashing algorithms in order to provide security and privacy over the network.
+This application uses AVL Tree, Hashing and Multigraph to share Images,Videos,Files,Text over the local network in an efficient manner.
+
+This app was made for Data Structures Laboratory project by Parithikrishnan and Nirupa.
 '''
 
-def open_new_page(title,backend_func=None):
-    global output_window,output_text
-    output_window=Toplevel(root)
+
+#------------------------------------------------------------- UI of the page ---------------------------------------------------
+
+
+def open_new_page(title, backend_func=None):
+    global output_window, output_text
+    output_window = Toplevel(root)
     output_window.geometry(f"{window_width}x{window_height}+{screen_width//8}+{screen_height//8}")
     output_window.title(title)
-    new_bg=Image.open(bg_image_path).resize((window_width,window_height),Image.LANCZOS)
-    new_bg_photo=ImageTk.PhotoImage(new_bg)
-    new_bg_label=Label(output_window,image=new_bg_photo)
-    new_bg_label.image=new_bg_photo
-    new_bg_label.place(relwidth=1,relheight=1)
-    code_frame=Frame(output_window,bg="#0a1a2a",bd=2,highlightbackground="#00b4d8")
-    code_frame.place(relwidth=0.9,relheight=0.8,relx=0.05,rely=0.1)
-    output_text=Text(code_frame,font=("Courier",12),fg="white",bg="#0a1a2a",insertbackground="white",wrap="word")
-    output_text.pack(fill="both",expand=True,padx=10,pady=10)
-    if backend_func and title != "About App":
-        def delayed_backend():
-            output_window.after(200, backend_func)
-        output_window.after(50, delayed_backend)
-    elif backend_func:
-        output_text.insert("1.0",backend_func())
-    back_button=Button(output_window,text="Back",command=output_window.destroy,
-                       font=("Arial",12,"bold"),fg="white",bg="#1a2a3a",
-                       activebackground="#00b4d8",activeforeground="black",
-                       relief="flat",padx=10,pady=5)
-    back_button.place(relx=0.9,rely=0.03)
+    new_bg = Image.open(bg_image_path).resize((window_width, window_height), Image.LANCZOS)
+    new_bg_photo = ImageTk.PhotoImage(new_bg)
+    new_bg_label = Label(output_window, image=new_bg_photo)
+    new_bg_label.image = new_bg_photo
+    new_bg_label.place(relwidth=1, relheight=1)
+    if title == "Chat":
+        if backend_func:
+            backend_func()
+    else:
+        code_frame = Frame(output_window, bg="#0a1a2a", bd=2, highlightbackground="#00b4d8")
+        code_frame.place(relwidth=0.9, relheight=0.8, relx=0.05, rely=0.1)
 
+        output_text = Text(code_frame, font=("Courier", 12), fg="white", bg="#0a1a2a",
+                           insertbackground="white", wrap="word")
+        output_text.pack(fill="both", expand=True, padx=10, pady=10)
+        if backend_func and title != "About App":
+            def delayed_backend():
+                output_window.after(200, backend_func)
+            output_window.after(50, delayed_backend)
+        elif backend_func:
+            output_text.insert("1.0", backend_func())
+    back_button = Button(output_window, text="Back", command=output_window.destroy,
+                         font=("Arial", 12, "bold"), fg="white", bg="#1a2a3a",
+                         activebackground="#00b4d8", activeforeground="black",
+                         relief="flat", padx=10, pady=5)
+    back_button.place(relx=0.9, rely=0.01)
 def on_enter(e):e.widget.config(bg="#0a1a2a",fg="cyan",relief="raised")
 def on_leave(e):e.widget.config(bg="black",fg="white",relief="flat")
 def styled_button(text,backend_func=None):
@@ -291,3 +550,4 @@ styled_button("Receive File",receive_file_backend)
 styled_button("About App",about_backend)
 root.mainloop()
 
+#--------------------------------------------------------------------------------------------------------------------------------

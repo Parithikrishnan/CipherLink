@@ -1,0 +1,6 @@
+          R---- [1744535072] parithi: okay
+     R---- [1744535061] siddhu: yeah fine
+Root: [1744535056] parithi: just chilling
+          R---- [1744535051] siddhu: what are you doign
+     L---- [1744535042] parithi: hiiii
+          L---- [1744535034] siddhu: hello 
