@@ -1,0 +1,1 @@
+multigraph.add_edge("Sender_name", "Receiver_name", "Hiiii Receiver_name", 1744545518)
